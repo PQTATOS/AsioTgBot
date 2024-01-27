@@ -1,5 +1,4 @@
 #include <iostream>
-#include <boost/asio/ssl.hpp>
 
 #include "network.hpp"
  
@@ -12,19 +11,16 @@ void Network::SendGETRequest()
     request_stream << "GET /bot6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0/getUpdates HTTP/1.1\r\n"
                        << "Host: api.telegram.org\r\n"
                        << "User-Agent: custom-client\r\n"
-                       << "Connection: close\r\n\r\n"
+                       << "Connection: close\r\n"
                        << "Content-Type: application/json\r\n"
-                       << "Content-Length: 32\r\n"
-                       << "\r\n\r\n"
-                       << "{\"allowed_updates\":[\"message\"]}";
+                       << "Content-Length: 32\r\n\r\n"
+                       << "{\"allowed_updates\":[\"message\"]}\r\n";
     
     SendRequest(request);
 }
 
 void Network::SendRequest(boost::asio::streambuf& request)
 {
-    boost::asio::io_service service;
-    boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::sslv23_client);
     boost::asio::ssl::stream<tcp::socket> socket(service, ssl_ctx);
 
     tcp::resolver resolver(service);
@@ -78,4 +74,15 @@ void Network::SendRequest(boost::asio::streambuf& request)
     while (boost::asio::read(socket, response,
           boost::asio::transfer_at_least(1), error))
       std::cout << &response;
+}
+
+void Network::ConnectBot(const Bot* bot)
+{
+    bots.push_back(bot);
+}
+
+void Network::StartPolling()
+{
+  SendGETRequest();
+  
 }
