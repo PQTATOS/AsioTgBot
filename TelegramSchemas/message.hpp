@@ -12,14 +12,14 @@ private:
     Chat* chat;
     unsigned int date;
 
-}
+};
 
 class MessageReactionUpdated
 {
 
-}
+};
 
 class MessageReactionCountUpdated
 {
 
-}
+};

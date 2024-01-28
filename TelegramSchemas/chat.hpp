@@ -6,7 +6,7 @@ enum class ChatType : int
     Groupe,
     SuperGroupe,
     Channel
-}
+};
 
 class Chat
 {
@@ -20,4 +20,4 @@ private:
     std::string last_name;
 
     bool is_forum;
-}
+};

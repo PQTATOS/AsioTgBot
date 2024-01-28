@@ -1,20 +1,25 @@
 #include <iostream>
 
 #include "network.hpp"
+#include "request.hpp"
  
 using boost::asio::ip::tcp;
 
-void Network::SendGETRequest()
+void Network::SendGETRequest(Request* req)
 {
     boost::asio::streambuf request;
     std::ostream request_stream(&request);
-    request_stream << "GET /bot6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0/getUpdates HTTP/1.1\r\n"
+    request_stream << "GET " << *(req->Url()) << " HTTP/1.1\r\n"
                        << "Host: api.telegram.org\r\n"
                        << "User-Agent: custom-client\r\n"
-                       << "Connection: close\r\n"
-                       << "Content-Type: application/json\r\n"
-                       << "Content-Length: 32\r\n\r\n"
-                       << "{\"allowed_updates\":[\"message\"]}\r\n";
+                       << "Connection: close\r\n";
+
+    if (!req->IsEmptyBody())
+      request_stream << "Content-Type: application/json\r\nContent-Length: " 
+                     << req->BodySize() << "\r\n\r\n"
+                     << req->Body();
+
+    request_stream << "\r\n";
     
     SendRequest(request);
 }
@@ -29,8 +34,7 @@ void Network::SendRequest(boost::asio::streambuf& request)
     
     boost::asio::connect(socket.lowest_layer(), iter);
     socket.handshake(boost::asio::ssl::stream_base::client);    
-    
-        // Send the request.
+
     boost::asio::write(socket, request);
     
         // Read the response status line. The response streambuf will automatically
@@ -76,13 +80,32 @@ void Network::SendRequest(boost::asio::streambuf& request)
       std::cout << &response;
 }
 
-void Network::ConnectBot(const Bot* bot)
+void Network::ConnectBot(Bot* bot)
 {
     bots.push_back(bot);
 }
 
 void Network::StartPolling()
 {
-  SendGETRequest();
-  
+    for(Bot* bot : bots)
+    {
+      std::vector<Update*>* updates = MakeUpdateRequest(bot);
+
+    }
+}
+
+std::vector<Update*>* Network::MakeUpdateRequest(Bot* bot)
+{
+    Request* req = new Request(bot, "getUpdates");
+    std::vector<std::pair<std::string, std::string>> params = {
+      std::make_pair("offset", std::to_string(bot->Offset())),
+      std::make_pair("timeout", std::to_string(bot->Timeout())),
+      std::make_pair("limit", std::to_string(bot->Limit()))
+    };
+
+    req->AddUrlParams(params);
+
+    SendGETRequest(req);
+    std::vector<Update*>* r = new std::vector<Update*>();
+    return r;
 }

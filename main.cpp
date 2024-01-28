@@ -4,7 +4,7 @@
 
 int main()
 {
-  Bot bot("329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0", ParseMode::HTML);
+  Bot bot("6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0", ParseMode::HTML);
   Network net;
   net.ConnectBot(&bot);
   net.StartPolling();

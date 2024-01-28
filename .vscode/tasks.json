@@ -15,6 +15,8 @@
                 "C:\\boost_build\\include\\boost-1_84",
                 "-I",
                 "C:\\boost_build\\lib",
+                "-I",
+                "${workspaceFolder}",
                 "-l",
                 "gdi32",
                 "-l",

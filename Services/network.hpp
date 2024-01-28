@@ -5,19 +5,21 @@
 
 #include "bot.hpp"
 #include "TelegramSchemas/update.hpp"
+#include "request.hpp"
 
 class Network
 {
 public:
     Network() {};
-    void ConnectBot(const Bot* bot);
+    void ConnectBot(Bot* bot);
     void StartPolling();
 private:
     void SendRequest(boost::asio::streambuf& request);
-    void SendGETRequest();
+    void SendGETRequest(Request* req);
     void SendPOSTRequest();
+    std::vector<Update*>* MakeUpdateRequest(Bot* bot);
 
-    std::vector<const Bot*> bots;
+    std::vector<Bot*> bots;
     boost::asio::io_service service;
     boost::asio::ssl::context ssl_ctx{boost::asio::ssl::context::sslv23_client};
 };

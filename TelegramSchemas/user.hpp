@@ -11,4 +11,4 @@ private:
     std::string last_name;
     std::string username;
 
-}
+};
