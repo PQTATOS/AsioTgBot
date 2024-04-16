@@ -35,10 +35,11 @@ void dispatcher::start()
 
 void dispatcher::process_responces()
 {
+    std::cout << "processing responce \n";
+    int x;
+    std::cin >> x;
     while(!this->net_poller->is_no_responce())
     {
-        std::cout << "processing responce \n";
-
         tg::response* resp = this->net_poller->get_responce();
         update* upd = convert_str(resp->body);
         this->updates_to_process.push(upd);
@@ -72,7 +73,7 @@ void dispatcher::get_updates()
         std::cin >> x;
         tg::request* req = new tg::request(
             tg::req_types::GET,
-            "/bot6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0/getUpdates?offset=-1",
+            "/bot6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0/getUpdates",
             "api.telegram.org"
         );
 
