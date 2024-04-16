@@ -16,5 +16,6 @@ namespace tg
 
         std::unordered_map<std::string, std::string> headers;
         std::string body;
+        size_t body_size;
     };
 }

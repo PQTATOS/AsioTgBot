@@ -8,28 +8,32 @@ poller::poller()
     std::cout << "Poller created\n";
 };
 
-void poller::handle_connect(const boost::system::error_code &e)
-{
+void poller::handle_connect(
+    const boost::system::error_code &e,
+    size_t sock_id
+) {
     std::cout << "Connect started\n";
-    boost::asio::ssl::stream<tcp::socket>* socket = new boost::asio::ssl::stream<tcp::socket>(service, *ssl_ctx);
+
     tcp::resolver resolver(this->service);
     tcp::resolver::query query("api.telegram.org" , "https");
 
+    utility::socket& sock = this->opened_sockets[sock_id];
+
     boost::asio::async_connect(
-        socket->lowest_layer(),
+        sock.get_lowest_layer(),
         resolver.resolve(query),
         boost::bind(
             &handle_handshake,
             this,
             boost::asio::placeholders::error,
-            socket
-            )
-        );
+            sock_id
+        )
+    );
 };
 
 void poller::handle_handshake(
     const boost::system::error_code &error,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    size_t sock_id
 ) {
     if (error)
     {
@@ -38,33 +42,36 @@ void poller::handle_handshake(
     }
     std::cout << "\tSocket connected\n";
 
-    sock->async_handshake(
+    utility::socket& sock = this->opened_sockets[sock_id];
+
+    sock.get_socket().async_handshake(
         boost::asio::ssl::stream_base::client,
         boost::bind(
             &send,
             this,
             boost::asio::placeholders::error,
-            sock
+            sock_id
         )
     );
 };
 
 void poller::send(
     const boost::system::error_code &error,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    size_t sock_id
 ) {
     if (error)
     {
         std::cout << "\tHanshake error: " << error.message() << '\n';
         return;
     }
-
     std::cout << "\tSocket make ssl handshake\n";
+
+    utility::socket& sock = this->opened_sockets[sock_id];
     const tg::request* req =  this->requests_to_process.front();
     this->requests_to_process.pop();
 
     boost::asio::async_write(
-        *sock,
+        sock.get_socket(),
         boost::asio::buffer(
             req->to_string()
         ),
@@ -72,16 +79,14 @@ void poller::send(
             &recive_status,
             this,
             boost::asio::placeholders::error,
-            new tg::response(),
-            sock
-            )
-        );
+            sock_id
+        )
+    );
 };
 
 void poller::recive_status(
     const boost::system::error_code &e,
-    tg::response* resp,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    size_t sock_id
 ) {
     if (e)
     {
@@ -90,24 +95,24 @@ void poller::recive_status(
     }
     std::cout << "\tSocket send msg\n";
 
+    utility::socket& sock = this->opened_sockets[sock_id];
+
     boost::asio::async_read_until(
-        *sock,
-        resp->raw_responce,
+        sock.get_socket(),
+        sock.get_streambuf(),
         "\r\n",
         boost::bind (
             &recive_headers,
             this,
             boost::asio::placeholders::error,
-            resp,
-            sock
+            sock_id
         )
     );
 };
 
 void poller::recive_headers(
     const boost::system::error_code &e,
-    tg::response* resp,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    size_t sock_id
 ) {
     if (e)
     {
@@ -115,24 +120,25 @@ void poller::recive_headers(
         return;
     }
     std::cout << "\tSocket recive status\n";
-    std::istream responce_stream(&resp->raw_responce);
+
+    utility::socket& sock = this->opened_sockets[sock_id];
+    sock.get_response();
+    std::istream responce_stream(&sock.get_streambuf());
 
     std::string http_ver;
-    responce_stream >> http_ver >> resp->status_code;
+    responce_stream >> http_ver >> sock.get_response().status_code;
 
-    std::getline(responce_stream, resp->status_msg);
-    std::cout << '\t' << resp->status_code << " " << resp->status_msg << '\n';
-
+    std::getline(responce_stream, sock.get_response().status_msg);
+    std::cout << '\t' << sock.get_response().status_code << " " << sock.get_response().status_msg << '\n';
     boost::asio::async_read_until(
-        *sock,
-        resp->raw_responce,
+        sock.get_socket(),
+        sock.get_streambuf(),
         "\r\n\r\n",
         boost::bind(
             &recive_body,
             this,
             boost::asio::placeholders::error,
-            resp,
-            sock
+            sock_id
         )
     );
 
@@ -140,8 +146,7 @@ void poller::recive_headers(
 
 void poller::recive_body(
     const boost::system::error_code &e,
-    tg::response* resp,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    size_t sock_id
 ) {
     if (e)
     {
@@ -150,76 +155,80 @@ void poller::recive_body(
     }
     std::cout << "\tSocket recive headers\n";
 
+    utility::socket& sock = this->opened_sockets[sock_id];
+
     std::string header;
-    std::istream responce_stream(&resp->raw_responce);
+    std::istream responce_stream(&sock.get_streambuf());
     while (std::getline(responce_stream, header) && header != "\r")
     {
         size_t delimetr_pos = header.find(": ");
         std::string key = header.substr(0, delimetr_pos),
                     value = header.substr(delimetr_pos+2, header.length());
-        resp->headers[key] = value;
+        sock.get_response().headers[key] = value;
         std::cout << "\t--" << header << '\n';
     }
 
-    std::cout << "\t\t" << std::stoi(resp->headers["Content-Length"]) << '\n';
     boost::asio::async_read(
-        *sock,
-        resp->raw_responce,
+        sock.get_socket(),
+        sock.get_streambuf(),
         boost::asio::transfer_at_least(1),
         boost::bind(
             &handle_body,
             this,
             boost::asio::placeholders::error,
-            resp,
-            sock
+            boost::asio::placeholders::bytes_transferred,
+            sock_id
         )
     );
 };
 
 void poller::handle_body(
     const boost::system::error_code &e,
-    tg::response* resp,
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> *sock
+    std::size_t bytes_transferred,
+    size_t sock_id
 ) {
     if (e && e != boost::asio::error::eof)
     {
         std::cout << "\tRead body error: " << e.message() << '\n';
         return;
     }
+
+    utility::socket& sock = this->opened_sockets[sock_id];
     if (e != boost::asio::error::eof)
     {
-        std::cout << "\tSocket recive body\n";
+        std::cout << "\t[Poller] socket " << sock_id << " recive body part\n\t stream size is " << sock.get_streambuf().size()  << '\n';
 
-        std::istream responce_stream(&resp->raw_responce);
-        std::string tmp;
-        responce_stream >> tmp;
-        resp->body += tmp;
-
-        std::cout << resp->body << '\n';
+        std::istream responce_stream(&sock.get_streambuf());
+        std::string body_part;
+        responce_stream >> body_part;
+        sock.get_response().body += body_part;
+        std::cout << body_part;
 
         boost::asio::async_read(
-            *sock,
-            resp->raw_responce,
+            sock.get_socket(),
+            sock.get_streambuf(),
             boost::asio::transfer_at_least(1),
             boost::bind(
                 &handle_body,
                 this,
                 boost::asio::placeholders::error,
-                resp,
-                sock
+                boost::asio::placeholders::bytes_transferred,
+                sock_id
             )
         );
     }
     else {
-        std::cout << "\tSocket recive body\n";
+        std::cout << "\t[Poller] socket " << sock_id << " recive full body\n\t stream size is " 
+        << sock.get_streambuf().size() << '\n';
 
-        std::istream responce_stream(&resp->raw_responce);
-        responce_stream >> resp->body;
+        std::istream responce_stream(&sock.get_streambuf());
+        std::string body_part;
+        responce_stream >> body_part;
+        sock.get_response().body += body_part;
 
-        std::cout << resp->body << '\n';
+        std::cout << sock.get_response().body << '\n';
 
-        delete sock;
-        this->responces_recived.push(resp);
+        this->responces_recived.push(sock.release_response());
     }
 };
 
@@ -255,9 +264,14 @@ void poller::run() {
     if (this->requests_to_process.empty())
         return;
 
-    handle_connect(boost::system::error_code());
+    for (size_t i = 0; i < this->requests_to_process.size(); ++i)
+    {
+        this->opened_sockets.emplace_back(this->service, *this->ssl_ctx);
+        handle_connect(boost::system::error_code(), i);
+    }
     this->service.run();
-    this->service.reset();
 
     std::cout << "Poller finished run\n";
+    this->opened_sockets.clear();
+    this->service.reset();
 };
