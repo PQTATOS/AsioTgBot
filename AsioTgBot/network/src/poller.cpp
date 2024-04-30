@@ -23,7 +23,7 @@ void poller::handle_connect(
         sock.get_lowest_layer(),
         resolver.resolve(query),
         boost::bind(
-            &handle_handshake,
+            &poller::handle_handshake,
             this,
             boost::asio::placeholders::error,
             sock_id
@@ -47,7 +47,7 @@ void poller::handle_handshake(
     sock.get_socket().async_handshake(
         boost::asio::ssl::stream_base::client,
         boost::bind(
-            &send,
+            &poller::send,
             this,
             boost::asio::placeholders::error,
             sock_id
@@ -76,7 +76,7 @@ void poller::send(
             req->to_string()
         ),
         boost::bind(
-            &recive_status,
+            &poller::recive_status,
             this,
             boost::asio::placeholders::error,
             sock_id
@@ -102,7 +102,7 @@ void poller::recive_status(
         sock.get_streambuf(),
         "\r\n",
         boost::bind (
-            &recive_headers,
+            &poller::recive_headers,
             this,
             boost::asio::placeholders::error,
             sock_id
@@ -135,7 +135,7 @@ void poller::recive_headers(
         sock.get_streambuf(),
         "\r\n\r\n",
         boost::bind(
-            &recive_body,
+            &poller::recive_body,
             this,
             boost::asio::placeholders::error,
             sock_id
@@ -173,7 +173,7 @@ void poller::recive_body(
         sock.get_streambuf(),
         boost::asio::transfer_at_least(1),
         boost::bind(
-            &handle_body,
+            &poller::handle_body,
             this,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred,
@@ -209,7 +209,7 @@ void poller::handle_body(
             sock.get_streambuf(),
             boost::asio::transfer_at_least(1),
             boost::bind(
-                &handle_body,
+                &poller::handle_body,
                 this,
                 boost::asio::placeholders::error,
                 boost::asio::placeholders::bytes_transferred,
