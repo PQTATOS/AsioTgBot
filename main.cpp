@@ -1,12 +1,12 @@
-#include <iostream>
-#include "Services/network.hpp"
-#include "Services/bot.hpp"
+#include "AsioTgBot/network/include/tgbot.hpp"
+#include "AsioTgBot/network/include/dispatcher.hpp"
 
 int main()
 {
-  Bot bot("6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0", ParseMode::HTML);
-  Network net;
-  net.ConnectBot(&bot);
-  net.StartPolling();
+  tgbot bot("6329343331:AAER5UjGOmLh_G7wBbEG7VNtBvyYQBD84Z0", parse_mode::HTML);
+  dispatcher dispatch;
+  dispatch.add_bot(&bot);
+
+  dispatch.start();
   return 0;
 }
